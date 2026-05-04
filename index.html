@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Solana 交易手续费分析</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace">
+        <header class="topbar brand-hero">
+          <div class="brand-block">
+            <img class="brand-avatar" src="assets/candice-avatar.jpg" alt="Candice 头像" />
+            <div>
+              <p class="eyebrow">Solana On-chain Fee Inspector</p>
+              <h1>交易手续费构成分析</h1>
+              <p class="subtitle">Candice的军火库系列</p>
+              <a class="brand-link" href="https://x.com/miloofbtc?s=21" target="_blank" rel="noreferrer">
+                x.com/miloofbtc
+              </a>
+            </div>
+          </div>
+          <div class="network-pill">Mainnet / Devnet / 自定义 RPC</div>
+        </header>
+
+        <form id="txForm" class="query-panel">
+          <label class="field tx-field">
+            <span>Solana 交易签名</span>
+            <input
+              id="signatureInput"
+              name="signature"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="填入 tx signature，例如 5J..."
+              required
+            />
+          </label>
+
+          <label class="field endpoint-field">
+            <span>RPC 节点</span>
+            <select id="clusterSelect" aria-label="RPC 节点">
+              <option value="https://api.mainnet-beta.solana.com">Mainnet Beta</option>
+              <option value="https://api.devnet.solana.com">Devnet</option>
+              <option value="custom">自定义</option>
+            </select>
+          </label>
+
+          <label class="field custom-rpc hidden" id="customRpcWrap">
+            <span>自定义 RPC URL</span>
+            <input id="customRpcInput" placeholder="https://..." />
+          </label>
+
+          <button id="analyzeButton" type="submit">
+            <span class="button-icon" aria-hidden="true">⌕</span>
+            分析交易
+          </button>
+        </form>
+
+        <section id="notice" class="notice hidden"></section>
+
+        <section id="result" class="result hidden">
+          <div class="summary-board">
+            <article class="metric total-card">
+              <span>已估值总成本</span>
+              <strong id="topTotalCost">-</strong>
+              <small id="topTotalCostDetail">网络费 + 平台/钱包费 + 押金</small>
+            </article>
+            <article class="metric cost-ratio-card">
+              <span>成本 / 交易额</span>
+              <strong id="topCostRatio">-</strong>
+              <small id="topCostRatioDetail">总成本占本次交易额比例</small>
+            </article>
+            <article class="metric notional-card">
+              <span>交易额</span>
+              <strong id="topTradeNotional">-</strong>
+              <small id="topTradeNotionalDetail">SOL / USDT 实时价格</small>
+            </article>
+          </div>
+          <div class="fee-metrics">
+            <div class="mini-grid">
+              <article class="metric">
+                <span>实际网络手续费</span>
+                <strong id="totalFee">-</strong>
+                <small id="totalFeeLamports">-</small>
+              </article>
+              <article class="metric">
+                <span>基础签名费</span>
+                <strong id="baseFee">-</strong>
+                <small id="signatureCount">-</small>
+              </article>
+              <article class="metric">
+                <span>优先费</span>
+                <strong id="priorityFee">-</strong>
+                <small id="priorityFormula">-</small>
+              </article>
+              <article class="metric">
+                <span>计算单元</span>
+                <strong id="computeUsage">-</strong>
+                <small id="computeLimit">-</small>
+              </article>
+            </div>
+          </div>
+
+          <section class="fee-categories">
+            <article class="category-card chain">
+              <span>Solana 链相关费用</span>
+              <strong id="chainFeeAmount">-</strong>
+              <small id="chainFeeDetail">基础费 + 优先费</small>
+            </article>
+            <article class="category-card pump">
+              <span>Pump.fun / PumpSwap 相关费用</span>
+              <strong id="pumpFeeAmount">-</strong>
+              <small id="pumpFeeDetail">池子费用 / 协议费 / 创作者费</small>
+            </article>
+            <article class="category-card route">
+              <span>Router / 交易工具相关费用</span>
+              <strong id="routeFeeAmount">-</strong>
+              <small id="routeFeeDetail">Jupiter / GMGN / 钱包 / Referral</small>
+            </article>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>主流协议 / 交易工具识别</h2>
+              <span id="ruleMatchSummary" class="muted">规则引擎输出</span>
+            </div>
+            <div id="ruleMatchList" class="rows"></div>
+          </section>
+
+          <div class="content-grid">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>费用拆分</h2>
+                <span id="statusBadge" class="badge">-</span>
+              </div>
+              <div id="breakdownList" class="rows"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <h2>付款人与余额变化</h2>
+                <span id="slotInfo" class="muted">-</span>
+              </div>
+              <div id="payerList" class="rows"></div>
+            </section>
+          </div>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>总成本汇总</h2>
+              <span id="totalCostSummary" class="muted">网络费 + 平台/钱包费 + 租金押金</span>
+            </div>
+            <div id="totalCostList" class="rows"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>平台 / 钱包 / 推荐费汇总</h2>
+              <span id="platformFeeSummary" class="muted">按链上转账与已知程序识别</span>
+            </div>
+            <div id="platformFeeList" class="rows"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>交易内转账拆分</h2>
+              <span class="muted">用于区分 swap 本金、费用、押金和退款</span>
+            </div>
+            <div id="transferList" class="rows"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>账户创建 / 租金押金线索</h2>
+              <span class="muted">可退还成本，不属于网络手续费</span>
+            </div>
+            <div id="rentList" class="rows"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Compute Budget 指令</h2>
+              <span class="muted">优先费来源</span>
+            </div>
+            <div id="budgetList" class="rows"></div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js?v=16"></script>
+  </body>
+</html>
